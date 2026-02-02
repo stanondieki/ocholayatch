@@ -1,10 +1,12 @@
 'use client'
 
 import { motion } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { Anchor, Users, Briefcase, Heart, Ship, Star, CheckCircle, ArrowRight, Sparkles, Globe, Calendar, Shield } from 'lucide-react';
 import { ImageWithFallback } from '@/components/figma/ImageWithFallback';
 
 export default function ServicesPage() {
+  const router = useRouter();
   const services = [
     {
       icon: Anchor,
@@ -244,6 +246,7 @@ export default function ServicesPage() {
                     <motion.button
                       whileHover={{ scale: 1.05, x: 5 }}
                       whileTap={{ scale: 0.95 }}
+                      onClick={() => router.push('/contact')}
                       className={`inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r ${service.color} text-white rounded-full hover:shadow-2xl hover:shadow-purple-500/50 transition-all text-lg uppercase tracking-wider`}
                     >
                       Learn More
@@ -401,6 +404,7 @@ export default function ServicesPage() {
               <motion.button
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/contact')}
                 className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-12 py-6 rounded-full text-lg uppercase tracking-wider hover:shadow-2xl hover:shadow-cyan-500/50 transition-all"
               >
                 Get Started
@@ -408,6 +412,7 @@ export default function ServicesPage() {
               <motion.button
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/yachts')}
                 className="bg-white/10 backdrop-blur-xl border-2 border-white/30 text-white px-12 py-6 rounded-full text-lg uppercase tracking-wider hover:bg-white/20 transition-all"
               >
                 View Fleet

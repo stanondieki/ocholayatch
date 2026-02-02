@@ -1,17 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Ruler, MapPin, Anchor, Search, Filter } from 'lucide-react';
-import { yachts } from '@/data/yachts';
+import { Users, Ruler, MapPin, Anchor, Search, Filter, Loader2 } from 'lucide-react';
 import { Yacht } from '@/types';
 import { BookingModal } from '@/components/BookingModal';
+import { yachtApi } from '@/lib/api';
 
 export default function BookPage() {
+  const [yachts, setYachts] = useState<Yacht[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedYacht, setSelectedYacht] = useState<Yacht | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
+
+  // Fetch yachts from API
+  useEffect(() => {
+    const fetchYachts = async () => {
+      try {
+        setLoading(true);
+        const response = await yachtApi.getYachts({});
+        
+        // Transform API data to match Yacht type
+        const transformedYachts = response.data.map((yacht: any) => ({
+          id: yacht._id,
+          name: yacht.name,
+          description: yacht.description,
+          price: yacht.price,
+          location: yacht.location,
+          category: yacht.category,
+          image: yacht.image,
+          images: yacht.images || [yacht.image],
+          guests: yacht.capacity,
+          cabins: yacht.cabins,
+          length: typeof yacht.length === 'string' ? parseInt(yacht.length) : yacht.length,
+          crew: yacht.crew || 5,
+          amenities: yacht.amenities || [],
+        }));
+        
+        setYachts(transformedYachts);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching yachts:', err);
+        setError(err.message || 'Failed to load yachts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchYachts();
+  }, []);
 
   // Get unique locations
   const locations = ['all', ...Array.from(new Set(yachts.map(y => y.location)))];
@@ -86,8 +126,24 @@ export default function BookPage() {
           </motion.div>
 
           {/* Yacht Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredYachts.map((yacht, index) => (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+              <p className="text-white/70">Loading available yachts...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <p className="text-red-400 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-all"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredYachts.map((yacht, index) => (
               <motion.div
                 key={yacht.id}
                 initial={{ opacity: 0, y: 50 }}
@@ -182,10 +238,11 @@ export default function BookPage() {
                 </div>
               </motion.div>
             ))}
-          </div>
+            </div>
+          )}
 
           {/* No Results */}
-          {filteredYachts.length === 0 && (
+          {!loading && !error && filteredYachts.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

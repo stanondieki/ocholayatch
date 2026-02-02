@@ -1,11 +1,13 @@
 'use client'
 
 import { motion } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { MapPin, Sparkles, Sun, Palmtree, Waves, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
 import { ImageWithFallback } from '@/components/figma/ImageWithFallback';
 import { useState } from 'react';
 
 export default function DestinationsPage() {
+  const router = useRouter();
   const [selectedRegion, setSelectedRegion] = useState('All');
 
   const destinations = [
@@ -276,6 +278,7 @@ export default function DestinationsPage() {
                       <motion.button
                         whileHover={{ scale: 1.02, x: 5 }}
                         whileTap={{ scale: 0.98 }}
+                        onClick={() => router.push(`/yachts?location=${encodeURIComponent(destination.name)}`)}
                         className={`w-full bg-gradient-to-r ${destination.gradient} text-white py-4 rounded-2xl flex items-center justify-center gap-3 hover:shadow-2xl transition-all text-lg uppercase tracking-wider`}
                       >
                         Explore Destination
@@ -317,6 +320,7 @@ export default function DestinationsPage() {
               <motion.button
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/contact')}
                 className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-12 py-6 rounded-full text-lg uppercase tracking-wider hover:shadow-2xl hover:shadow-cyan-500/50 transition-all"
               >
                 Plan Your Journey
@@ -324,6 +328,7 @@ export default function DestinationsPage() {
               <motion.button
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/yachts')}
                 className="bg-white/10 backdrop-blur-xl border-2 border-white/30 text-white px-12 py-6 rounded-full text-lg uppercase tracking-wider hover:bg-white/20 transition-all"
               >
                 View Yachts

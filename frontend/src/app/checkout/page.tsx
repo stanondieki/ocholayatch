@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Bitcoin, Check, Lock, Calendar, Users, Anchor, Copy, CheckCircle } from 'lucide-react';
+import { CreditCard, Bitcoin, Check, Lock, Calendar, Users, Anchor, Copy, CheckCircle, ArrowRight, Shield, Sparkles, Ship, Clock, AlertCircle } from 'lucide-react';
 import { BookingData, getPendingBooking, clearPendingBooking, saveBooking, generateBookingId } from '@/lib/bookingStore';
+import { bookingApi } from '@/lib/api';
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -12,7 +13,9 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'crypto'>('card');
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Card Payment Form
   const [cardNumber, setCardNumber] = useState('');
@@ -41,29 +44,46 @@ export default function CheckoutPage() {
     if (!booking) return;
     
     setProcessing(true);
+    setError(null);
     
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Save completed booking
-    saveBooking({
-      ...booking,
-      id: generateBookingId(),
-      paymentMethod,
-      bookingDate: new Date().toISOString(),
-      status: paymentMethod === 'card' ? 'confirmed' : 'pending',
-    });
-    
-    // Clear pending booking
-    clearPendingBooking();
-    
-    setProcessing(false);
-    setCompleted(true);
-    
-    // Redirect after showing success
-    setTimeout(() => {
-      router.push('/my-bookings');
-    }, 3000);
+    try {
+      // Create booking in backend
+      const bookingData = {
+        yachtId: booking.yacht.id,
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        guests: booking.guests,
+        totalPrice: booking.totalPrice,
+        paymentMethod: paymentMethod,
+        specialRequests: '',
+      };
+      
+      const response = await bookingApi.createBooking(bookingData);
+      
+      // Save completed booking locally
+      saveBooking({
+        ...booking,
+        id: response.data._id || generateBookingId(),
+        paymentMethod,
+        bookingDate: new Date().toISOString(),
+        status: paymentMethod === 'card' ? 'confirmed' : 'pending',
+      });
+      
+      // Clear pending booking
+      clearPendingBooking();
+      
+      setCompleted(true);
+      
+      // Redirect after showing success
+      setTimeout(() => {
+        router.push('/my-bookings');
+      }, 3000);
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      setError(err.response?.data?.message || 'Payment failed. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const formatCardNumber = (value: string) => {
@@ -90,17 +110,30 @@ export default function CheckoutPage() {
   if (!booking) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center pt-20">
-        <div className="text-center">
-          <div className="text-6xl mb-6">🛥️</div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md mx-auto px-4"
+        >
+          <motion.div
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-8xl mb-8"
+          >
+            🛥️
+          </motion.div>
           <h1 className="text-4xl text-white mb-4">No Booking Found</h1>
-          <p className="text-white/60 mb-8">Please select a yacht first</p>
-          <button
-            onClick={() => router.push('/book')}
-            className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:opacity-90 transition-opacity"
+          <p className="text-white/60 mb-8 text-lg">Please select a yacht to start your booking</p>
+          <motion.button
+            onClick={() => router.push('/yachts')}
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            className="px-10 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl hover:shadow-xl hover:shadow-purple-500/30 transition-all flex items-center gap-2 mx-auto"
           >
             Browse Yachts
-          </button>
-        </div>
+            <ArrowRight className="w-5 h-5" />
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
@@ -117,36 +150,76 @@ export default function CheckoutPage() {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring' }}
-            className="inline-flex p-8 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full mb-8"
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+            className="relative inline-block mb-8"
           >
-            <Check className="w-20 h-20 text-white" />
+            <motion.div
+              animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-0 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full blur-xl"
+            />
+            <div className="relative p-8 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full">
+              <Check className="w-20 h-20 text-white" />
+            </div>
           </motion.div>
-          <h1 className="text-5xl font-bold text-white mb-4">Booking Confirmed!</h1>
-          <p className="text-xl text-white/70 mb-8">
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-5xl font-bold text-white mb-4"
+          >
+            Booking Confirmed!
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-xl text-white/70 mb-8"
+          >
             Your luxury yacht experience is secured. Redirecting to your bookings...
-          </p>
-          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-            <h3 className="text-2xl text-white mb-4">{booking.yacht.name}</h3>
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div>
-                <div className="text-white/60 text-sm">Check-in</div>
-                <div className="text-white">{new Date(booking.startDate).toLocaleDateString()}</div>
+          </motion.p>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden">
+                <img src={booking.yacht.image} alt={booking.yacht.name} className="w-full h-full object-cover" />
               </div>
-              <div>
-                <div className="text-white/60 text-sm">Check-out</div>
-                <div className="text-white">{new Date(booking.endDate).toLocaleDateString()}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-sm">Guests</div>
-                <div className="text-white">{booking.guests}</div>
-              </div>
-              <div>
-                <div className="text-white/60 text-sm">Total</div>
-                <div className="text-white font-bold">${booking.totalPrice.toLocaleString()}</div>
+              <div className="text-left">
+                <h3 className="text-2xl text-white">{booking.yacht.name}</h3>
+                <p className="text-white/60">{booking.yacht.location}</p>
               </div>
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-4 text-left">
+              <div className="bg-white/5 rounded-xl p-4">
+                <div className="text-white/60 text-sm mb-1">Check-in</div>
+                <div className="text-white font-medium">{new Date(booking.startDate).toLocaleDateString()}</div>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4">
+                <div className="text-white/60 text-sm mb-1">Check-out</div>
+                <div className="text-white font-medium">{new Date(booking.endDate).toLocaleDateString()}</div>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4">
+                <div className="text-white/60 text-sm mb-1">Guests</div>
+                <div className="text-white font-medium">{booking.guests}</div>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4">
+                <div className="text-white/60 text-sm mb-1">Total Paid</div>
+                <div className="text-white font-bold text-lg">${booking.totalPrice.toLocaleString()}</div>
+              </div>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8"
+          >
+            <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto" />
+          </motion.div>
         </motion.div>
       </div>
     );
@@ -154,91 +227,147 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-black pt-24 pb-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Background Effects */}
+      <div className="fixed inset-0 pointer-events-none">
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 10, repeat: Infinity }}
+          className="absolute top-0 right-1/4 w-96 h-96 bg-purple-600 rounded-full blur-[150px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 12, repeat: Infinity, delay: 1 }}
+          className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-600 rounded-full blur-[150px]"
+        />
+      </div>
+
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur-xl border border-purple-500/30 px-6 py-3 rounded-full mb-6"
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span className="text-sm uppercase tracking-wider text-white">Final Step</span>
+          </motion.div>
+          <h1 className="text-4xl lg:text-6xl font-bold text-white mb-4">
             Secure <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">Checkout</span>
           </h1>
-          <div className="flex items-center justify-center gap-2 text-white/60">
-            <Lock className="w-4 h-4" />
-            <span>256-bit SSL Encrypted</span>
+          <div className="flex items-center justify-center gap-4 text-white/60">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-green-400" />
+              <span>256-bit SSL Encrypted</span>
+            </div>
+            <span>•</span>
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-blue-400" />
+              <span>Secure Payment</span>
+            </div>
           </div>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left - Booking Summary */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
             className="lg:col-span-1"
           >
-            <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-2xl p-6 sticky top-24">
-              <h2 className="text-xl font-semibold text-white mb-4">Booking Summary</h2>
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sticky top-24">
+              <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                <Ship className="w-5 h-5 text-purple-400" />
+                Booking Summary
+              </h2>
               
               {/* Yacht Image */}
-              <div className="relative h-40 rounded-xl overflow-hidden mb-4">
+              <div className="relative h-48 rounded-2xl overflow-hidden mb-6 group">
                 <img
                   src={booking.yacht.image}
                   alt={booking.yacht.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                <div className="absolute bottom-3 left-3">
-                  <h3 className="text-lg font-semibold text-white">{booking.yacht.name}</h3>
-                  <p className="text-white/60 text-sm">{booking.yacht.location}</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                <div className="absolute bottom-4 left-4 right-4">
+                  <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-xs text-white font-medium mb-2 inline-block">
+                    {booking.yacht.category}
+                  </span>
+                  <h3 className="text-xl font-semibold text-white">{booking.yacht.name}</h3>
+                  <p className="text-white/70 text-sm">{booking.yacht.location}</p>
                 </div>
               </div>
 
               {/* Details */}
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-white/70">
-                  <Calendar className="w-4 h-4 text-purple-400" />
-                  <div className="flex-1">
-                    <div className="text-xs text-white/50">Check-in</div>
-                    <div className="text-white">{new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+              <div className="space-y-4 mb-6">
+                <motion.div 
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  whileHover={{ x: 5 }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-purple-400" />
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-white/70">
-                  <Calendar className="w-4 h-4 text-blue-400" />
                   <div className="flex-1">
-                    <div className="text-xs text-white/50">Check-out</div>
-                    <div className="text-white">{new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                    <div className="text-xs text-white/50 uppercase tracking-wider">Check-in</div>
+                    <div className="text-white font-medium">{new Date(booking.startDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-white/70">
-                  <Users className="w-4 h-4 text-cyan-400" />
+                </motion.div>
+                <motion.div 
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  whileHover={{ x: 5 }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-blue-400" />
+                  </div>
                   <div className="flex-1">
-                    <div className="text-xs text-white/50">Guests</div>
-                    <div className="text-white">{booking.guests} People</div>
+                    <div className="text-xs text-white/50 uppercase tracking-wider">Check-out</div>
+                    <div className="text-white font-medium">{new Date(booking.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 text-white/70">
-                  <Anchor className="w-4 h-4 text-pink-400" />
+                </motion.div>
+                <motion.div 
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  whileHover={{ x: 5 }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-cyan-600/20 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-cyan-400" />
+                  </div>
                   <div className="flex-1">
-                    <div className="text-xs text-white/50">Duration</div>
-                    <div className="text-white">{booking.days} Days</div>
+                    <div className="text-xs text-white/50 uppercase tracking-wider">Guests</div>
+                    <div className="text-white font-medium">{booking.guests} People</div>
                   </div>
-                </div>
+                </motion.div>
+                <motion.div 
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  whileHover={{ x: 5 }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-pink-600/20 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-pink-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs text-white/50 uppercase tracking-wider">Duration</div>
+                    <div className="text-white font-medium">{booking.days} Days</div>
+                  </div>
+                </motion.div>
               </div>
 
               {/* Price Breakdown */}
-              <div className="border-t border-white/10 pt-4 space-y-2">
+              <div className="border-t border-white/10 pt-6 space-y-3">
                 <div className="flex justify-between text-white/60">
                   <span>${booking.yacht.price.toLocaleString()} × {booking.days} days</span>
-                  <span>${(booking.yacht.price * booking.days).toLocaleString()}</span>
+                  <span className="text-white">${(booking.yacht.price * booking.days).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-white/60">
                   <span>Service fee (10%)</span>
-                  <span>${(booking.yacht.price * booking.days * 0.1).toLocaleString()}</span>
+                  <span className="text-white">${(booking.yacht.price * booking.days * 0.1).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-xl font-bold text-white pt-2 border-t border-white/10">
+                <div className="flex justify-between text-xl font-bold text-white pt-4 border-t border-white/10">
                   <span>Total</span>
-                  <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent text-2xl">
                     ${booking.totalPrice.toLocaleString()}
                   </span>
                 </div>
@@ -248,172 +377,267 @@ export default function CheckoutPage() {
 
           {/* Right - Payment Form */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-6">Payment Method</h2>
+            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
+              <h2 className="text-2xl font-semibold text-white mb-8 flex items-center gap-2">
+                <CreditCard className="w-6 h-6 text-purple-400" />
+                Payment Method
+              </h2>
 
               {/* Payment Method Toggle */}
               <div className="grid grid-cols-2 gap-4 mb-8">
-                <button
+                <motion.button
                   onClick={() => setPaymentMethod('card')}
-                  className={`p-4 rounded-xl border-2 transition-all ${
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`p-6 rounded-2xl border-2 transition-all ${
                     paymentMethod === 'card'
-                      ? 'border-purple-500 bg-purple-500/10'
-                      : 'border-white/10 hover:border-white/20'
+                      ? 'border-purple-500 bg-purple-500/20 shadow-lg shadow-purple-500/20'
+                      : 'border-white/10 hover:border-white/20 bg-white/5'
                   }`}
                 >
-                  <CreditCard className={`w-6 h-6 mx-auto mb-2 ${paymentMethod === 'card' ? 'text-purple-400' : 'text-white/60'}`} />
-                  <div className={`font-medium ${paymentMethod === 'card' ? 'text-white' : 'text-white/60'}`}>
+                  <CreditCard className={`w-8 h-8 mx-auto mb-3 ${paymentMethod === 'card' ? 'text-purple-400' : 'text-white/60'}`} />
+                  <div className={`font-semibold text-lg ${paymentMethod === 'card' ? 'text-white' : 'text-white/60'}`}>
                     Credit Card
                   </div>
-                </button>
-                <button
+                  <p className={`text-sm mt-1 ${paymentMethod === 'card' ? 'text-white/70' : 'text-white/40'}`}>
+                    Instant confirmation
+                  </p>
+                </motion.button>
+                <motion.button
                   onClick={() => setPaymentMethod('crypto')}
-                  className={`p-4 rounded-xl border-2 transition-all ${
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`p-6 rounded-2xl border-2 transition-all ${
                     paymentMethod === 'crypto'
-                      ? 'border-purple-500 bg-purple-500/10'
-                      : 'border-white/10 hover:border-white/20'
+                      ? 'border-purple-500 bg-purple-500/20 shadow-lg shadow-purple-500/20'
+                      : 'border-white/10 hover:border-white/20 bg-white/5'
                   }`}
                 >
-                  <Bitcoin className={`w-6 h-6 mx-auto mb-2 ${paymentMethod === 'crypto' ? 'text-purple-400' : 'text-white/60'}`} />
-                  <div className={`font-medium ${paymentMethod === 'crypto' ? 'text-white' : 'text-white/60'}`}>
+                  <Bitcoin className={`w-8 h-8 mx-auto mb-3 ${paymentMethod === 'crypto' ? 'text-purple-400' : 'text-white/60'}`} />
+                  <div className={`font-semibold text-lg ${paymentMethod === 'crypto' ? 'text-white' : 'text-white/60'}`}>
                     Cryptocurrency
                   </div>
-                </button>
+                  <p className={`text-sm mt-1 ${paymentMethod === 'crypto' ? 'text-white/70' : 'text-white/40'}`}>
+                    BTC, ETH, USDT
+                  </p>
+                </motion.button>
               </div>
 
-              {/* Card Payment Form */}
-              {paymentMethod === 'card' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">Card Number</label>
-                    <input
-                      type="text"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">Cardholder Name</label>
-                    <input
-                      type="text"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      placeholder="John Doe"
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-white/60 mb-2">Expiry Date</label>
+              <AnimatePresence mode="wait">
+                {/* Card Payment Form */}
+                {paymentMethod === 'card' && (
+                  <motion.div
+                    key="card"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <motion.div
+                      animate={focusedField === 'cardNumber' ? { scale: 1.01 } : { scale: 1 }}
+                    >
+                      <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Card Number</label>
                       <input
                         type="text"
-                        value={expiryDate}
-                        onChange={(e) => {
-                          let value = e.target.value.replace(/\D/g, '');
-                          if (value.length >= 2) {
-                            value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                          }
-                          setExpiryDate(value);
-                        }}
-                        placeholder="MM/YY"
-                        maxLength={5}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-white/60 mb-2">CVV</label>
-                      <input
-                        type="text"
-                        value={cvv}
-                        onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        placeholder="123"
-                        maxLength={4}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Crypto Payment */}
-              {paymentMethod === 'crypto' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  <div className="grid grid-cols-3 gap-3">
-                    {cryptoOptions.map((crypto) => (
-                      <button
-                        key={crypto.symbol}
-                        onClick={() => setSelectedCrypto(crypto.symbol)}
-                        className={`p-3 rounded-xl border-2 transition-all ${
-                          selectedCrypto === crypto.symbol
-                            ? 'border-purple-500 bg-purple-500/10'
-                            : 'border-white/10 hover:border-white/20'
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                        onFocus={() => setFocusedField('cardNumber')}
+                        onBlur={() => setFocusedField(null)}
+                        placeholder="1234 5678 9012 3456"
+                        maxLength={19}
+                        className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
+                          focusedField === 'cardNumber' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
                         }`}
+                      />
+                    </motion.div>
+                    <motion.div
+                      animate={focusedField === 'cardName' ? { scale: 1.01 } : { scale: 1 }}
+                    >
+                      <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Cardholder Name</label>
+                      <input
+                        type="text"
+                        value={cardName}
+                        onChange={(e) => setCardName(e.target.value)}
+                        onFocus={() => setFocusedField('cardName')}
+                        onBlur={() => setFocusedField(null)}
+                        placeholder="John Doe"
+                        className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
+                          focusedField === 'cardName' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
+                        }`}
+                      />
+                    </motion.div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <motion.div
+                        animate={focusedField === 'expiry' ? { scale: 1.02 } : { scale: 1 }}
                       >
-                        <div className={`text-2xl mb-1 bg-gradient-to-r ${crypto.color} bg-clip-text text-transparent`}>
-                          {crypto.icon}
-                        </div>
-                        <div className={`text-sm font-medium ${selectedCrypto === crypto.symbol ? 'text-white' : 'text-white/60'}`}>
-                          {crypto.symbol}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                        <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Expiry Date</label>
+                        <input
+                          type="text"
+                          value={expiryDate}
+                          onChange={(e) => {
+                            let value = e.target.value.replace(/\D/g, '');
+                            if (value.length >= 2) {
+                              value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                            }
+                            setExpiryDate(value);
+                          }}
+                          onFocus={() => setFocusedField('expiry')}
+                          onBlur={() => setFocusedField(null)}
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
+                            focusedField === 'expiry' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
+                          }`}
+                        />
+                      </motion.div>
+                      <motion.div
+                        animate={focusedField === 'cvv' ? { scale: 1.02 } : { scale: 1 }}
+                      >
+                        <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">CVV</label>
+                        <input
+                          type="text"
+                          value={cvv}
+                          onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          onFocus={() => setFocusedField('cvv')}
+                          onBlur={() => setFocusedField(null)}
+                          placeholder="123"
+                          maxLength={4}
+                          className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
+                            focusedField === 'cvv' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
+                          }`}
+                        />
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
 
-                  <div className="p-4 bg-white/5 rounded-xl">
-                    <div className="text-sm text-white/60 mb-2">
-                      Send exactly <span className="text-white font-bold">${booking.totalPrice.toLocaleString()}</span> worth of {selectedCrypto} to:
+                {/* Crypto Payment */}
+                {paymentMethod === 'crypto' && (
+                  <motion.div
+                    key="crypto"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-3 gap-4">
+                      {cryptoOptions.map((crypto) => (
+                        <motion.button
+                          key={crypto.symbol}
+                          onClick={() => setSelectedCrypto(crypto.symbol)}
+                          whileHover={{ scale: 1.05, y: -3 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`p-4 rounded-2xl border-2 transition-all ${
+                            selectedCrypto === crypto.symbol
+                              ? 'border-purple-500 bg-purple-500/20'
+                              : 'border-white/10 hover:border-white/20 bg-white/5'
+                          }`}
+                        >
+                          <div className={`text-3xl mb-2 bg-gradient-to-r ${crypto.color} bg-clip-text text-transparent`}>
+                            {crypto.icon}
+                          </div>
+                          <div className={`text-sm font-medium ${selectedCrypto === crypto.symbol ? 'text-white' : 'text-white/60'}`}>
+                            {crypto.name}
+                          </div>
+                          <div className={`text-xs ${selectedCrypto === crypto.symbol ? 'text-white/70' : 'text-white/40'}`}>
+                            {crypto.symbol}
+                          </div>
+                        </motion.button>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 p-3 bg-black/30 rounded-lg text-white/80 text-sm break-all">
-                        {cryptoOptions.find(c => c.symbol === selectedCrypto)?.address}
-                      </code>
-                      <button
-                        onClick={() => copyToClipboard(cryptoOptions.find(c => c.symbol === selectedCrypto)?.address || '')}
-                        className="p-3 bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                      >
-                        {copied ? <CheckCircle className="w-5 h-5 text-white" /> : <Copy className="w-5 h-5 text-white" />}
-                      </button>
+
+                    <div className="p-6 bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-2xl border border-purple-500/20">
+                      <div className="text-sm text-white/60 mb-3">
+                        Send exactly <span className="text-white font-bold text-lg">${booking.totalPrice.toLocaleString()}</span> worth of {selectedCrypto} to:
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <code className="flex-1 p-4 bg-black/30 rounded-xl text-white/80 text-sm break-all font-mono">
+                          {cryptoOptions.find(c => c.symbol === selectedCrypto)?.address}
+                        </code>
+                        <motion.button
+                          onClick={() => copyToClipboard(cryptoOptions.find(c => c.symbol === selectedCrypto)?.address || '')}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="p-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors"
+                        >
+                          {copied ? <CheckCircle className="w-6 h-6 text-white" /> : <Copy className="w-6 h-6 text-white" />}
+                        </motion.button>
+                      </div>
+                      <p className="text-xs text-white/40 mt-4 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Payment will be confirmed within 30 minutes after blockchain confirmation
+                      </p>
                     </div>
-                    <p className="text-xs text-white/40 mt-2">
-                      Payment will be confirmed within 30 minutes after blockchain confirmation
-                    </p>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Error Message */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mt-6 bg-red-500/20 border border-red-500/50 rounded-xl p-4 flex items-center gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                    <p className="text-red-400 text-sm">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => setError(null)}
+                      className="ml-auto text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Pay Button */}
-              <button
+              <motion.button
                 onClick={handlePayment}
                 disabled={processing || !isFormValid}
-                className="w-full mt-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                whileHover={isFormValid && !processing ? { scale: 1.02, y: -2 } : {}}
+                whileTap={isFormValid && !processing ? { scale: 0.98 } : {}}
+                className="w-full mt-8 py-5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-lg rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-purple-500/30 relative overflow-hidden"
               >
+                {/* Shine effect */}
+                <motion.div
+                  animate={{ x: ['-200%', '200%'] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12"
+                />
                 {processing ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Processing...
+                    <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10" />
+                    <span className="relative z-10">Processing Payment...</span>
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" />
-                    {paymentMethod === 'card' ? 'Pay' : 'Confirm Payment'} ${booking.totalPrice.toLocaleString()}
+                    <Lock className="w-5 h-5 relative z-10" />
+                    <span className="relative z-10">{paymentMethod === 'card' ? 'Pay' : 'Confirm Payment'} ${booking.totalPrice.toLocaleString()}</span>
+                    <ArrowRight className="w-5 h-5 relative z-10" />
                   </>
                 )}
-              </button>
+              </motion.button>
+
+              {/* Trust Indicators */}
+              <div className="flex items-center justify-center gap-6 mt-6 text-white/40 text-sm">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-green-400" />
+                  <span>Money-back guarantee</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-blue-400" />
+                  <span>Free cancellation</span>
+                </div>
+              </div>
 
               <p className="text-center text-white/40 text-sm mt-4">
                 By completing this purchase you agree to our Terms of Service

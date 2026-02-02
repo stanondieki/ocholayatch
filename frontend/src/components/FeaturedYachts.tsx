@@ -1,131 +1,60 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { YachtCard } from './YachtCard';
 import { Yacht } from '@/types';
-import { Filter, X } from 'lucide-react';
-
-const yachts: Yacht[] = [
-  {
-    id: 1,
-    name: "Ocean Majesty",
-    location: "Monaco",
-    image: "https://images.unsplash.com/photo-1604771868982-003c36db0814?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMGRlY2slMjBzdW5zZXR8ZW58MXx8fHwxNzY0ODY2NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 15000,
-    guests: 12,
-    cabins: 6,
-    length: 150,
-    crew: 8,
-    category: 'Mediterranean',
-    description: "Experience unparalleled luxury aboard the Ocean Majesty. This magnificent superyacht combines classic elegance with modern amenities, perfect for exploring the Mediterranean in style.",
-    amenities: ["Jacuzzi", "Helipad", "Gym", "Cinema", "Jet Ski", "Water Toys", "WiFi", "Chef"],
-    images: [
-      "https://images.unsplash.com/photo-1604771868982-003c36db0814?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMGRlY2slMjBzdW5zZXR8ZW58MXx8fHwxNzY0ODY2NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1627761801957-4bf6cfb4fa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB5YWNodCUyMG9jZWFufGVufDF8fHx8MTc2NDc2Mjc3M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  },
-  {
-    id: 2,
-    name: "Azure Dream",
-    location: "Maldives",
-    image: "https://images.unsplash.com/photo-1637585569991-b013294d8f26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMHNhaWxpbmclMjBibHVlJTIwd2F0ZXJ8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 12000,
-    guests: 10,
-    cabins: 5,
-    length: 130,
-    crew: 6,
-    category: 'Tropical',
-    description: "Sail through crystal-clear waters aboard Azure Dream. Perfect for intimate gatherings and tropical adventures in the Indian Ocean's most stunning locations.",
-    amenities: ["Jacuzzi", "Diving Equipment", "Paddleboards", "Gym", "WiFi", "Chef", "Water Toys"],
-    images: [
-      "https://images.unsplash.com/photo-1637585569991-b013294d8f26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMHNhaWxpbmclMjBibHVlJTIwd2F0ZXJ8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1627761801957-4bf6cfb4fa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB5YWNodCUyMG9jZWFufGVufDF8fHx8MTc2NDc2Mjc3M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  },
-  {
-    id: 3,
-    name: "Serenity Elite",
-    location: "Caribbean",
-    image: "https://images.unsplash.com/photo-1692942198293-c600f7c9cb53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWdhJTIweWFjaHQlMjBhZXJpYWx8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 18000,
-    guests: 14,
-    cabins: 7,
-    length: 180,
-    crew: 10,
-    category: 'Caribbean',
-    description: "The ultimate in maritime luxury, Serenity Elite offers an unforgettable Caribbean experience with world-class amenities and exceptional service.",
-    amenities: ["Helipad", "Jacuzzi", "Cinema", "Gym", "Spa", "Beach Club", "Jet Ski", "WiFi", "Chef", "Water Toys"],
-    images: [
-      "https://images.unsplash.com/photo-1692942198293-c600f7c9cb53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWdhJTIweWFjaHQlMjBhZXJpYWx8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  },
-  {
-    id: 4,
-    name: "Horizon Explorer",
-    location: "Greek Islands",
-    image: "https://images.unsplash.com/photo-1735208073648-5f08ae9a8b29?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMG1hcmluYSUyMGhhcmJvcnxlbnwxfHx8fDE3NjQ4NjY1NDd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 10000,
-    guests: 8,
-    cabins: 4,
-    length: 110,
-    crew: 5,
-    category: 'Mediterranean',
-    description: "Discover the magic of the Aegean Sea aboard Horizon Explorer. Ideal for island hopping and experiencing authentic Greek hospitality.",
-    amenities: ["Jacuzzi", "Paddleboards", "Snorkeling Gear", "WiFi", "Chef", "Water Toys"],
-    images: [
-      "https://images.unsplash.com/photo-1735208073648-5f08ae9a8b29?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMG1hcmluYSUyMGhhcmJvcnxlbnwxfHx8fDE3NjQ4NjY1NDd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1637585569991-b013294d8f26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMHNhaWxpbmclMjBibHVlJTIwd2F0ZXJ8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  },
-  {
-    id: 5,
-    name: "Royal Sapphire",
-    location: "French Riviera",
-    image: "https://images.unsplash.com/photo-1627761801957-4bf6cfb4fa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB5YWNodCUyMG9jZWFufGVufDF8fHx8MTc2NDc2Mjc3M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 20000,
-    guests: 16,
-    cabins: 8,
-    length: 200,
-    crew: 12,
-    category: 'Mediterranean',
-    description: "A crown jewel of yacht charters, Royal Sapphire embodies sophistication and grandeur, perfect for the most discerning travelers on the Côte d'Azur.",
-    amenities: ["Helipad", "Jacuzzi", "Cinema", "Gym", "Spa", "Beach Club", "Jet Ski", "WiFi", "Chef", "Water Toys", "Wine Cellar"],
-    images: [
-      "https://images.unsplash.com/photo-1627761801957-4bf6cfb4fa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB5YWNodCUyMG9jZWFufGVufDF8fHx8MTc2NDc2Mjc3M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1604771868982-003c36db0814?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMGRlY2slMjBzdW5zZXR8ZW58MXx8fHwxNzY0ODY2NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  },
-  {
-    id: 6,
-    name: "Paradise Voyager",
-    location: "Dubai",
-    image: "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 16000,
-    guests: 12,
-    cabins: 6,
-    length: 160,
-    crew: 9,
-    category: 'Middle East',
-    description: "Modern luxury meets Arabian hospitality on Paradise Voyager. Explore the stunning coastline of Dubai and the UAE in absolute comfort.",
-    amenities: ["Jacuzzi", "Gym", "Cinema", "Jet Ski", "Diving Equipment", "WiFi", "Chef", "Water Toys"],
-    images: [
-      "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1692942198293-c600f7c9cb53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWdhJTIweWFjaHQlMjBhZXJpYWx8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-    ]
-  }
-];
+import { Filter, X, Loader2 } from 'lucide-react';
+import { yachtApi } from '@/lib/api';
 
 interface FeaturedYachtsProps {
   onYachtClick?: (yacht: Yacht) => void;
 }
 
 export function FeaturedYachts({ onYachtClick }: FeaturedYachtsProps) {
+  const [yachts, setYachts] = useState<Yacht[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const categories = ['All', 'Mediterranean', 'Caribbean', 'Tropical', 'Middle East'];
+
+  useEffect(() => {
+    const fetchYachts = async () => {
+      try {
+        setLoading(true);
+        const response = await yachtApi.getFeaturedYachts();
+        
+        // Transform API data to match Yacht type
+        const transformedYachts = response.data.map((yacht: any) => ({
+          id: yacht._id,
+          name: yacht.name,
+          description: yacht.description,
+          shortDescription: yacht.shortDescription,
+          price: yacht.price,
+          location: yacht.location,
+          category: yacht.category,
+          image: yacht.image,
+          images: yacht.images || [yacht.image],
+          guests: yacht.capacity,
+          cabins: yacht.cabins,
+          length: yacht.length,
+          year: yacht.year,
+          amenities: yacht.amenities || [],
+          crew: yacht.crew,
+        }));
+        
+        setYachts(transformedYachts);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching featured yachts:', err);
+        setError(err.message || 'Failed to load yachts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchYachts();
+  }, []);
 
   const filteredYachts = selectedCategory === 'All'
     ? yachts
@@ -303,25 +232,54 @@ export function FeaturedYachts({ onYachtClick }: FeaturedYachtsProps) {
 
         {/* Yachts Grid */}
         <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedCategory}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-          >
-            {filteredYachts.map((yacht, index) => (
-              <motion.div
-                key={yacht.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1, duration: 0.6 }}
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-20"
+            >
+              <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+              <p className="text-white/70">Loading featured yachts...</p>
+            </motion.div>
+          ) : error ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-20"
+            >
+              <p className="text-red-400 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition-all"
               >
-                <YachtCard yacht={yacht} onClick={() => onYachtClick?.(yacht)} />
-              </motion.div>
-            ))}
-          </motion.div>
+                Try Again
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={selectedCategory}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              {filteredYachts.map((yacht, index) => (
+                <motion.div
+                  key={yacht.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1, duration: 0.6 }}
+                >
+                  <YachtCard yacht={yacht} onClick={() => onYachtClick?.(yacht)} />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* View All Button */}

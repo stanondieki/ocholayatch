@@ -1,109 +1,23 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { Filter, Grid, List, Search, Sliders, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Grid, List, Search, SlidersHorizontal, Sparkles, Loader2 } from 'lucide-react';
 import { YachtCard } from '@/components/YachtCard';
+import { yachtApi } from '@/lib/api';
 import { Yacht } from '@/types';
 
-const allYachts: Yacht[] = [
-  {
-    id: 1,
-    name: "Ocean Majesty",
-    location: "Monaco",
-    image: "https://images.unsplash.com/photo-1604771868982-003c36db0814?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMGRlY2slMjBzdW5zZXR8ZW58MXx8fHwxNzY0ODY2NTQ1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 15000,
-    guests: 12,
-    cabins: 6,
-    length: 150,
-    crew: 8,
-    category: 'Mediterranean',
-    description: "Experience unparalleled luxury aboard the Ocean Majesty.",
-    amenities: ["Jacuzzi", "Helipad", "Gym", "Cinema"],
-    images: []
-  },
-  {
-    id: 2,
-    name: "Azure Dream",
-    location: "Maldives",
-    image: "https://images.unsplash.com/photo-1637585569991-b013294d8f26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMHNhaWxpbmclMjBibHVlJTIwd2F0ZXJ8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 12000,
-    guests: 10,
-    cabins: 5,
-    length: 130,
-    crew: 6,
-    category: 'Tropical',
-    description: "Sail through crystal-clear waters aboard Azure Dream.",
-    amenities: ["Jacuzzi", "Diving Equipment", "Paddleboards"],
-    images: []
-  },
-  {
-    id: 3,
-    name: "Serenity Elite",
-    location: "Caribbean",
-    image: "https://images.unsplash.com/photo-1692942198293-c600f7c9cb53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWdhJTIweWFjaHQlMjBhZXJpYWx8ZW58MXx8fHwxNzY0ODY2NTQ2fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 18000,
-    guests: 14,
-    cabins: 7,
-    length: 180,
-    crew: 10,
-    category: 'Caribbean',
-    description: "The ultimate in maritime luxury.",
-    amenities: ["Helipad", "Jacuzzi", "Cinema", "Gym"],
-    images: []
-  },
-  {
-    id: 4,
-    name: "Horizon Explorer",
-    location: "Greek Islands",
-    image: "https://images.unsplash.com/photo-1735208073648-5f08ae9a8b29?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5YWNodCUyMG1hcmluYSUyMGhhcmJvcnxlbnwxfHx8fDE3NjQ4NjY1NDd8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 10000,
-    guests: 8,
-    cabins: 4,
-    length: 110,
-    crew: 5,
-    category: 'Mediterranean',
-    description: "Discover the magic of the Aegean Sea.",
-    amenities: ["Jacuzzi", "Paddleboards", "Snorkeling Gear"],
-    images: []
-  },
-  {
-    id: 5,
-    name: "Royal Sapphire",
-    location: "French Riviera",
-    image: "https://images.unsplash.com/photo-1627761801957-4bf6cfb4fa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjB5YWNodCUyMG9jZWFufGVufDF8fHx8MTc2NDc2Mjc3M3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 20000,
-    guests: 16,
-    cabins: 8,
-    length: 200,
-    crew: 12,
-    category: 'Mediterranean',
-    description: "A crown jewel of yacht charters.",
-    amenities: ["Helipad", "Jacuzzi", "Cinema", "Gym", "Spa"],
-    images: []
-  },
-  {
-    id: 6,
-    name: "Paradise Voyager",
-    location: "Dubai",
-    image: "https://images.unsplash.com/photo-1573717865061-202c78c4b414?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB5YWNodCUyMGludGVyaW9yfGVufDF8fHx8MTc2NDc4NDg5MXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-    price: 16000,
-    guests: 12,
-    cabins: 6,
-    length: 160,
-    crew: 9,
-    category: 'Middle East',
-    description: "Modern luxury meets Arabian hospitality.",
-    amenities: ["Jacuzzi", "Gym", "Cinema", "Jet Ski"],
-    images: []
-  },
-];
+const categories = ['All', 'Superyacht', 'Megayacht', 'Luxury Yacht'];
 
-interface YachtsPageProps {
-  onYachtClick?: (yacht: Yacht) => void;
-}
-
-export default function YachtsPage({ onYachtClick }: YachtsPageProps) {
+export default function YachtsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const locationParam = searchParams.get('location');
+  
+  const [yachts, setYachts] = useState<Yacht[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 25000]);
@@ -111,16 +25,66 @@ export default function YachtsPage({ onYachtClick }: YachtsPageProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
 
-  const categories = ['All', 'Mediterranean', 'Caribbean', 'Tropical', 'Middle East'];
+  // Fetch yachts from API
+  useEffect(() => {
+    const fetchYachts = async () => {
+      try {
+        setLoading(true);
+        const response = await yachtApi.getYachts({
+          search: locationParam || undefined,
+          category: selectedCategory !== 'All' ? selectedCategory : undefined,
+          minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
+          maxPrice: priceRange[1] < 25000 ? priceRange[1] : undefined,
+          minCapacity: guestCount > 0 ? guestCount : undefined,
+        });
+        
+        // Transform API data to match Yacht type
+        const transformedYachts = response.data.map((yacht: any) => ({
+          id: yacht._id,
+          name: yacht.name,
+          description: yacht.description,
+          price: yacht.price,
+          location: yacht.location,
+          category: yacht.category,
+          image: yacht.image,
+          images: yacht.images || [yacht.image],
+          guests: yacht.capacity,
+          cabins: yacht.cabins,
+          length: yacht.length,
+          crew: yacht.crew || 5,
+          amenities: yacht.amenities || [],
+        }));
+        
+        setYachts(transformedYachts);
+        setError(null);
+      } catch (err: any) {
+        console.error('Error fetching yachts:', err);
+        setError(err.message || 'Failed to load yachts');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredYachts = allYachts.filter(yacht => {
-    const matchesSearch = yacht.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         yacht.location.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || yacht.category === selectedCategory;
-    const matchesPrice = yacht.price >= priceRange[0] && yacht.price <= priceRange[1];
-    const matchesGuests = guestCount === 0 || yacht.guests >= guestCount;
-    
-    return matchesSearch && matchesCategory && matchesPrice && matchesGuests;
+    fetchYachts();
+  }, [locationParam, selectedCategory, priceRange, guestCount]);
+
+  // Set search term from URL parameter
+  useEffect(() => {
+    if (locationParam) {
+      setSearchTerm(locationParam);
+    }
+  }, [locationParam]);
+
+  const handleYachtClick = (yacht: Yacht) => {
+    router.push(`/yachts/${yacht.id}`);
+  };
+
+  // Client-side search filtering (for instant search feedback)
+  const filteredYachts = yachts.filter(yacht => {
+    const matchesSearch = searchTerm === '' || 
+      yacht.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      yacht.location.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
   });
 
   return (
@@ -322,32 +286,55 @@ export default function YachtsPage({ onYachtClick }: YachtsPageProps) {
           </AnimatePresence>
 
           {/* Yachts Grid */}
-          <AnimatePresence mode="wait">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 text-purple-500 animate-spin mb-4" />
+              <p className="text-white/60 text-lg">Loading yachts...</p>
+            </div>
+          ) : error ? (
             <motion.div
-              key={`${selectedCategory}-${searchTerm}-${viewMode}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.5 }}
-              className={viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' 
-                : 'space-y-8'
-              }
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-20"
             >
-              {filteredYachts.map((yacht, index) => (
-                <motion.div
-                  key={yacht.id}
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <YachtCard yacht={yacht} onClick={() => onYachtClick?.(yacht)} />
-                </motion.div>
-              ))}
+              <div className="text-6xl mb-6">⚠️</div>
+              <h3 className="text-3xl text-white mb-4">Error loading yachts</h3>
+              <p className="text-white/60 text-lg mb-6">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full"
+              >
+                Try Again
+              </button>
             </motion.div>
-          </AnimatePresence>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${selectedCategory}-${searchTerm}-${viewMode}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5 }}
+                className={viewMode === 'grid' 
+                  ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' 
+                  : 'space-y-8'
+                }
+              >
+                {filteredYachts.map((yacht, index) => (
+                  <motion.div
+                    key={yacht.id}
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <YachtCard yacht={yacht} onClick={() => handleYachtClick(yacht)} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          )}
 
-          {filteredYachts.length === 0 && (
+          {!loading && !error && filteredYachts.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
