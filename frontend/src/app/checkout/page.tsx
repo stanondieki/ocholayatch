@@ -3,9 +3,124 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Bitcoin, Check, Lock, Calendar, Users, Anchor, Copy, CheckCircle, ArrowRight, Shield, Sparkles, Ship, Clock, AlertCircle } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { CreditCard, Bitcoin, Check, Lock, Calendar, Users, Copy, CheckCircle, ArrowRight, Shield, Sparkles, Ship, Clock, AlertCircle } from 'lucide-react';
 import { BookingData, getPendingBooking, clearPendingBooking, saveBooking, generateBookingId } from '@/lib/bookingStore';
-import { bookingApi } from '@/lib/api';
+import { bookingApi, paymentApi } from '@/lib/api';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+
+// Stripe Payment Form Component
+function StripePaymentForm({ 
+  booking, 
+  onSuccess, 
+  onError 
+}: { 
+  booking: BookingData; 
+  onSuccess: () => void;
+  onError: (error: string) => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/my-bookings`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        onError(error.message || 'Payment failed');
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Create booking in backend
+        try {
+          await bookingApi.createBooking({
+            yachtId: booking.yacht.id,
+            startDate: booking.startDate,
+            endDate: booking.endDate,
+            guests: booking.guests,
+            totalPrice: booking.totalPrice,
+            paymentMethod: 'card',
+            guestInfo: {
+              firstName: 'Guest',
+              lastName: 'User',
+              email: 'guest@example.com',
+              phone: '',
+            },
+          });
+        } catch (bookingError) {
+          console.error('Booking creation error:', bookingError);
+        }
+
+        // Save completed booking locally
+        saveBooking({
+          ...booking,
+          id: paymentIntent.id || generateBookingId(),
+          paymentMethod: 'card',
+          bookingDate: new Date().toISOString(),
+          status: 'confirmed',
+        });
+
+        clearPendingBooking();
+        onSuccess();
+      }
+    } catch (err: any) {
+      onError(err.message || 'Payment failed. Please try again.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PaymentElement 
+        options={{
+          layout: 'tabs',
+        }}
+      />
+      <motion.button
+        type="submit"
+        disabled={!stripe || processing}
+        whileHover={!processing ? { scale: 1.02, y: -2 } : {}}
+        whileTap={!processing ? { scale: 0.98 } : {}}
+        className="w-full py-5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-lg rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-purple-500/30 relative overflow-hidden"
+      >
+        <motion.div
+          animate={{ x: ['-200%', '200%'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12"
+        />
+        {processing ? (
+          <>
+            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10" />
+            <span className="relative z-10">Processing Payment...</span>
+          </>
+        ) : (
+          <>
+            <Lock className="w-5 h-5 relative z-10" />
+            <span className="relative z-10">Pay ${booking.totalPrice.toLocaleString()}</span>
+            <ArrowRight className="w-5 h-5 relative z-10" />
+          </>
+        )}
+      </motion.button>
+    </form>
+  );
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -15,16 +130,17 @@ export default function CheckoutPage() {
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-
-  // Card Payment Form
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   // Crypto Payment
   const [selectedCrypto, setSelectedCrypto] = useState('BTC');
+
+  const cryptoOptions = [
+    { symbol: 'BTC', name: 'Bitcoin', address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', icon: '₿', color: 'from-orange-500 to-yellow-500' },
+    { symbol: 'ETH', name: 'Ethereum', address: '0x742d35Cc6634C0532925a3b844Bc454', icon: 'Ξ', color: 'from-blue-500 to-purple-500' },
+    { symbol: 'USDT', name: 'Tether', address: '0x742d35Cc6634C0532925a3b844Bc454', icon: '₮', color: 'from-green-500 to-emerald-500' },
+  ];
 
   // Load booking from localStorage on mount
   useEffect(() => {
@@ -34,67 +150,88 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  const cryptoOptions = [
-    { symbol: 'BTC', name: 'Bitcoin', address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', icon: '₿', color: 'from-orange-500 to-yellow-500' },
-    { symbol: 'ETH', name: 'Ethereum', address: '0x742d35Cc6634C0532925a3b844Bc454', icon: 'Ξ', color: 'from-blue-500 to-purple-500' },
-    { symbol: 'USDT', name: 'Tether', address: '0x742d35Cc6634C0532925a3b844Bc454', icon: '₮', color: 'from-green-500 to-emerald-500' },
-  ];
+  // Create Stripe PaymentIntent when card payment is selected
+  useEffect(() => {
+    if (booking && paymentMethod === 'card' && !clientSecret) {
+      createPaymentIntent();
+    }
+  }, [booking, paymentMethod]);
 
-  const handlePayment = async () => {
+  const createPaymentIntent = async () => {
+    if (!booking) return;
+
+    setLoadingPayment(true);
+    try {
+      const response = await paymentApi.createPaymentIntent({
+        amount: booking.totalPrice,
+        currency: 'usd',
+        metadata: {
+          yachtName: booking.yacht.name,
+          yachtId: String(booking.yacht.id),
+        },
+      });
+      setClientSecret(response.clientSecret);
+    } catch (err: any) {
+      console.error('Error creating payment intent:', err);
+      setError('Failed to initialize payment. Please try again.');
+    } finally {
+      setLoadingPayment(false);
+    }
+  };
+
+  const handleCryptoPayment = async () => {
     if (!booking) return;
     
     setProcessing(true);
     setError(null);
     
     try {
-      // Create booking in backend
-      const bookingData = {
+      await bookingApi.createBooking({
         yachtId: booking.yacht.id,
         startDate: booking.startDate,
         endDate: booking.endDate,
         guests: booking.guests,
         totalPrice: booking.totalPrice,
-        paymentMethod: paymentMethod,
-        specialRequests: '',
-      };
-      
-      const response = await bookingApi.createBooking(bookingData);
-      
-      // Save completed booking locally
+        paymentMethod: 'crypto',
+        cryptoDetails: {
+          currency: selectedCrypto,
+          address: cryptoOptions.find(c => c.symbol === selectedCrypto)?.address || '',
+        },
+        guestInfo: {
+          firstName: 'Guest',
+          lastName: 'User',
+          email: 'guest@example.com',
+          phone: '',
+        },
+      });
+
       saveBooking({
         ...booking,
-        id: response.data._id || generateBookingId(),
-        paymentMethod,
+        id: generateBookingId(),
+        paymentMethod: 'crypto',
         bookingDate: new Date().toISOString(),
-        status: paymentMethod === 'card' ? 'confirmed' : 'pending',
+        status: 'pending',
       });
-      
-      // Clear pending booking
+
       clearPendingBooking();
-      
       setCompleted(true);
-      
-      // Redirect after showing success
+
       setTimeout(() => {
         router.push('/my-bookings');
       }, 3000);
     } catch (err: any) {
       console.error('Payment error:', err);
-      setError(err.response?.data?.message || 'Payment failed. Please try again.');
+      setError(err.message || 'Payment failed. Please try again.');
     } finally {
       setProcessing(false);
     }
   };
 
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = (matches && matches[0]) || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    return parts.length ? parts.join(' ') : value;
+  const handlePaymentSuccess = () => {
+    setCompleted(true);
+    setTimeout(() => {
+      router.push('/my-bookings');
+    }, 3000);
   };
 
   const copyToClipboard = (text: string) => {
@@ -102,9 +239,6 @@ export default function CheckoutPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const isFormValid = paymentMethod === 'crypto' || 
-    (cardNumber.replace(/\s/g, '').length === 16 && cardName && expiryDate && cvv.length >= 3);
 
   // No booking found
   if (!booking) {
@@ -168,7 +302,7 @@ export default function CheckoutPage() {
             transition={{ delay: 0.3 }}
             className="text-5xl font-bold text-white mb-4"
           >
-            Booking Confirmed!
+            {paymentMethod === 'card' ? 'Payment Successful!' : 'Booking Submitted!'}
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -176,7 +310,9 @@ export default function CheckoutPage() {
             transition={{ delay: 0.4 }}
             className="text-xl text-white/70 mb-8"
           >
-            Your luxury yacht experience is secured. Redirecting to your bookings...
+            {paymentMethod === 'card' 
+              ? 'Your luxury yacht experience is confirmed. Redirecting to your bookings...'
+              : 'Your booking is pending crypto payment confirmation. Redirecting...'}
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -207,7 +343,7 @@ export default function CheckoutPage() {
                 <div className="text-white font-medium">{booking.guests}</div>
               </div>
               <div className="bg-white/5 rounded-xl p-4">
-                <div className="text-white/60 text-sm mb-1">Total Paid</div>
+                <div className="text-white/60 text-sm mb-1">Total</div>
                 <div className="text-white font-bold text-lg">${booking.totalPrice.toLocaleString()}</div>
               </div>
             </div>
@@ -306,7 +442,7 @@ export default function CheckoutPage() {
               {/* Details */}
               <div className="space-y-4 mb-6">
                 <motion.div 
-                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl"
                   whileHover={{ x: 5 }}
                 >
                   <div className="w-10 h-10 rounded-xl bg-purple-600/20 flex items-center justify-center">
@@ -314,11 +450,11 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex-1">
                     <div className="text-xs text-white/50 uppercase tracking-wider">Check-in</div>
-                    <div className="text-white font-medium">{new Date(booking.startDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                    <div className="text-white font-medium">{new Date(booking.startDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
                   </div>
                 </motion.div>
                 <motion.div 
-                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl"
                   whileHover={{ x: 5 }}
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
@@ -326,11 +462,11 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex-1">
                     <div className="text-xs text-white/50 uppercase tracking-wider">Check-out</div>
-                    <div className="text-white font-medium">{new Date(booking.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                    <div className="text-white font-medium">{new Date(booking.endDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
                   </div>
                 </motion.div>
                 <motion.div 
-                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl"
                   whileHover={{ x: 5 }}
                 >
                   <div className="w-10 h-10 rounded-xl bg-cyan-600/20 flex items-center justify-center">
@@ -342,7 +478,7 @@ export default function CheckoutPage() {
                   </div>
                 </motion.div>
                 <motion.div 
-                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-white/5 rounded-xl"
                   whileHover={{ x: 5 }}
                 >
                   <div className="w-10 h-10 rounded-xl bg-pink-600/20 flex items-center justify-center">
@@ -405,7 +541,7 @@ export default function CheckoutPage() {
                     Credit Card
                   </div>
                   <p className={`text-sm mt-1 ${paymentMethod === 'card' ? 'text-white/70' : 'text-white/40'}`}>
-                    Instant confirmation
+                    Powered by Stripe
                   </p>
                 </motion.button>
                 <motion.button
@@ -429,90 +565,71 @@ export default function CheckoutPage() {
               </div>
 
               <AnimatePresence mode="wait">
-                {/* Card Payment Form */}
+                {/* Card Payment with Stripe */}
                 {paymentMethod === 'card' && (
                   <motion.div
                     key="card"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="space-y-6"
                   >
-                    <motion.div
-                      animate={focusedField === 'cardNumber' ? { scale: 1.01 } : { scale: 1 }}
-                    >
-                      <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                        onFocus={() => setFocusedField('cardNumber')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder="1234 5678 9012 3456"
-                        maxLength={19}
-                        className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
-                          focusedField === 'cardNumber' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
-                        }`}
-                      />
-                    </motion.div>
-                    <motion.div
-                      animate={focusedField === 'cardName' ? { scale: 1.01 } : { scale: 1 }}
-                    >
-                      <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Cardholder Name</label>
-                      <input
-                        type="text"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value)}
-                        onFocus={() => setFocusedField('cardName')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder="John Doe"
-                        className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
-                          focusedField === 'cardName' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
-                        }`}
-                      />
-                    </motion.div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <motion.div
-                        animate={focusedField === 'expiry' ? { scale: 1.02 } : { scale: 1 }}
+                    {loadingPayment ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                        <span className="ml-3 text-white/60">Initializing secure payment...</span>
+                      </div>
+                    ) : clientSecret ? (
+                      <Elements
+                        stripe={stripePromise}
+                        options={{
+                          clientSecret,
+                          appearance: {
+                            theme: 'night',
+                            variables: {
+                              colorPrimary: '#9333ea',
+                              colorBackground: '#1a1a2e',
+                              colorText: '#ffffff',
+                              colorDanger: '#ef4444',
+                              fontFamily: 'system-ui, sans-serif',
+                              borderRadius: '12px',
+                            },
+                            rules: {
+                              '.Input': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                padding: '16px 20px',
+                              },
+                              '.Input:focus': {
+                                borderColor: '#9333ea',
+                                boxShadow: '0 0 0 2px rgba(147, 51, 234, 0.3)',
+                              },
+                              '.Label': {
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                fontSize: '12px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
+                              },
+                            },
+                          },
+                        }}
                       >
-                        <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">Expiry Date</label>
-                        <input
-                          type="text"
-                          value={expiryDate}
-                          onChange={(e) => {
-                            let value = e.target.value.replace(/\D/g, '');
-                            if (value.length >= 2) {
-                              value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                            }
-                            setExpiryDate(value);
-                          }}
-                          onFocus={() => setFocusedField('expiry')}
-                          onBlur={() => setFocusedField(null)}
-                          placeholder="MM/YY"
-                          maxLength={5}
-                          className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
-                            focusedField === 'expiry' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
-                          }`}
+                        <StripePaymentForm
+                          booking={booking}
+                          onSuccess={handlePaymentSuccess}
+                          onError={(err) => setError(err)}
                         />
-                      </motion.div>
-                      <motion.div
-                        animate={focusedField === 'cvv' ? { scale: 1.02 } : { scale: 1 }}
-                      >
-                        <label className="block text-sm text-white/60 mb-2 uppercase tracking-wider">CVV</label>
-                        <input
-                          type="text"
-                          value={cvv}
-                          onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                          onFocus={() => setFocusedField('cvv')}
-                          onBlur={() => setFocusedField(null)}
-                          placeholder="123"
-                          maxLength={4}
-                          className={`w-full px-6 py-4 bg-white/5 border rounded-2xl text-white text-lg placeholder-white/30 focus:outline-none transition-all ${
-                            focusedField === 'cvv' ? 'border-purple-500 ring-2 ring-purple-500/30' : 'border-white/10'
-                          }`}
-                        />
-                      </motion.div>
-                    </div>
+                      </Elements>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-white/60">Failed to initialize payment. Please refresh the page.</p>
+                        <button
+                          onClick={createPaymentIntent}
+                          className="mt-4 px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-colors"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    )}
                   </motion.div>
                 )}
 
@@ -573,6 +690,32 @@ export default function CheckoutPage() {
                         Payment will be confirmed within 30 minutes after blockchain confirmation
                       </p>
                     </div>
+
+                    <motion.button
+                      onClick={handleCryptoPayment}
+                      disabled={processing}
+                      whileHover={!processing ? { scale: 1.02, y: -2 } : {}}
+                      whileTap={!processing ? { scale: 0.98 } : {}}
+                      className="w-full py-5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-lg rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-purple-500/30 relative overflow-hidden"
+                    >
+                      <motion.div
+                        animate={{ x: ['-200%', '200%'] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12"
+                      />
+                      {processing ? (
+                        <>
+                          <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10" />
+                          <span className="relative z-10">Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-5 h-5 relative z-10" />
+                          <span className="relative z-10">I&apos;ve Sent the Payment</span>
+                          <ArrowRight className="w-5 h-5 relative z-10" />
+                        </>
+                      )}
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -599,36 +742,8 @@ export default function CheckoutPage() {
                 )}
               </AnimatePresence>
 
-              {/* Pay Button */}
-              <motion.button
-                onClick={handlePayment}
-                disabled={processing || !isFormValid}
-                whileHover={isFormValid && !processing ? { scale: 1.02, y: -2 } : {}}
-                whileTap={isFormValid && !processing ? { scale: 0.98 } : {}}
-                className="w-full mt-8 py-5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-lg rounded-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg shadow-purple-500/30 relative overflow-hidden"
-              >
-                {/* Shine effect */}
-                <motion.div
-                  animate={{ x: ['-200%', '200%'] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12"
-                />
-                {processing ? (
-                  <>
-                    <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin relative z-10" />
-                    <span className="relative z-10">Processing Payment...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-5 h-5 relative z-10" />
-                    <span className="relative z-10">{paymentMethod === 'card' ? 'Pay' : 'Confirm Payment'} ${booking.totalPrice.toLocaleString()}</span>
-                    <ArrowRight className="w-5 h-5 relative z-10" />
-                  </>
-                )}
-              </motion.button>
-
               {/* Trust Indicators */}
-              <div className="flex items-center justify-center gap-6 mt-6 text-white/40 text-sm">
+              <div className="flex items-center justify-center gap-6 mt-8 text-white/40 text-sm">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-green-400" />
                   <span>Money-back guarantee</span>

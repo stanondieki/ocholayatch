@@ -15,6 +15,7 @@ export interface IBooking extends Document {
   totalPrice: number;
   paymentMethod: 'card' | 'crypto';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  stripePaymentIntentId?: string;
   cryptoDetails?: {
     currency: string;
     address: string;
@@ -48,6 +49,7 @@ const BookingSchema = new Schema<IBooking>(
     totalPrice: { type: Number, required: true },
     paymentMethod: { type: String, enum: ['card', 'crypto'], required: true },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
+    stripePaymentIntentId: { type: String },
     cryptoDetails: {
       currency: { type: String },
       address: { type: String },

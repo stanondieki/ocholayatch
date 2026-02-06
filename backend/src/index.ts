@@ -8,6 +8,7 @@ import yachtRoutes from './routes/yacht.routes';
 import authRoutes from './routes/auth.routes';
 import bookingRoutes from './routes/booking.routes';
 import contactRoutes from './routes/contact.routes';
+import paymentRoutes from './routes/payment.routes';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,7 @@ app.get('/', (req, res) => {
 app.use('/api/yachts', yachtRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api', contactRoutes); // For /api/contact and /api/newsletter
 
 // 404 handler

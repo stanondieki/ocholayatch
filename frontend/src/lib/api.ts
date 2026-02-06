@@ -276,10 +276,32 @@ export const authHelpers = {
   },
 };
 
+// ==================== PAYMENT API ====================
+export const paymentApi = {
+  // Create payment intent
+  createPaymentIntent: (data: { amount: number; currency?: string; bookingId?: string; metadata?: Record<string, string> }) =>
+    apiRequest<{ success: boolean; clientSecret: string; paymentIntentId: string }>('/payments/create-intent', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Confirm payment
+  confirmPayment: (data: { paymentIntentId: string; bookingId?: string }) =>
+    apiRequest<{ success: boolean; message: string; status: string }>('/payments/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Get payment status
+  getPaymentStatus: (paymentIntentId: string) =>
+    apiRequest<{ success: boolean; status: string; amount: number; currency: string }>(`/payments/status/${paymentIntentId}`),
+};
+
 export default {
   yacht: yachtApi,
   auth: authApi,
   booking: bookingApi,
   contact: contactApi,
+  payment: paymentApi,
   authHelpers,
 };
