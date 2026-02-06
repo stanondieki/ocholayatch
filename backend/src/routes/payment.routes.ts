@@ -5,7 +5,7 @@ import {
   handleWebhook,
   getPaymentStatus,
 } from '../controllers/payment.controller';
-import { auth, optionalAuth } from '../middleware/auth.middleware';
+import { authenticate, optionalAuth } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
